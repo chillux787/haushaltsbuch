@@ -168,6 +168,15 @@ pre.code{background:var(--chip);border-radius:12px;padding:12px;font-size:11.5px
 .cat.ord .n small{display:block;margin:2px 0 0}
 .cat.ord button{width:38px;height:38px}
 .cat.ord.dim .n,.cat.ord.dim>.ic{opacity:.55}
+.loan{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.loan:last-child{border-bottom:0}
+.loan .t{flex:1;min-width:0}.loan .t small{display:block;color:var(--mute);font-size:13px;margin-top:2px}
+.loan.done .t,.loan.done b{opacity:.5;text-decoration:line-through}
+.loan .tag{font-size:11.5px;color:var(--mute);margin-left:6px;text-decoration:none}
+#v-loans .sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+#v-loans .sum div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+#v-loans .sum small{display:block;color:var(--mute);font-size:12.5px}
+#v-loans .sum b{font-size:18px}
 </style>
 </head>
 <body>
@@ -178,7 +187,7 @@ pre.code{background:var(--chip);border-radius:12px;padding:12px;font-size:11.5px
   </header>
   <main>
     <div id="banner" hidden></div>
-    <div class="seg five" id="moreTabs" hidden><button data-m="cats"><span data-ic="tag"></span>Kategorien</button><button data-m="accts"><span data-ic="wallet"></span>Konten</button><button data-m="orders"><span data-ic="repeat"></span>Daueraufträge</button><button data-m="excel"><span data-ic="cloud"></span>Daten</button><button data-m="settings"><span data-ic="sliders"></span>Einstellungen</button></div>
+    <div class="seg five" id="moreTabs" hidden><button data-m="cats"><span data-ic="tag"></span>Kategorien</button><button data-m="accts"><span data-ic="wallet"></span>Konten</button><button data-m="orders"><span data-ic="repeat"></span>Daueraufträge</button><button data-m="loans"><span data-ic="users"></span>Leihgaben</button><button data-m="excel"><span data-ic="cloud"></span>Daten</button><button data-m="settings"><span data-ic="sliders"></span>Einstellungen</button></div>
     <section id="v-overview"></section>
     <section id="v-history"></section>
     <section id="v-stats">
@@ -259,6 +268,7 @@ pre.code{background:var(--chip);border-radius:12px;padding:12px;font-size:11.5px
 
     <section id="v-excel"></section>
     <section id="v-orders"></section>
+    <section id="v-loans"></section>
     <section id="v-settings"></section>
   </main>
   <nav><div>
@@ -437,6 +447,7 @@ const ICONS={
  transfer:'<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
  banknote:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
  pause:'<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+ users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
  play:'<path d="M6 3 20 12 6 21 6 3Z"/>'
 };
 const ic=(n,cls)=>`<span class="ic${cls?' '+cls:''}" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[n]||''}</svg></span>`;
@@ -461,7 +472,7 @@ function defaults(){
   const d={
     cats:[...['Lebensmittel','Miete','Mobilität','Freizeit','Gesundheit','Shopping','Sonstiges'].map(n=>({name:n,type:'out'})),
           ...['Gehalt','Sonstiges'].map(n=>({name:n,type:'in'}))],
-    accts:[{name:'Bar'}],checks:[],orders:[],
+    accts:[{name:'Bar'}],checks:[],orders:[],loans:[],
     tx:[],meta:{dirty:0,lastExport:null}
   };
   paint(d.cats);return d;
@@ -472,7 +483,7 @@ function load(){
     if(s&&Array.isArray(s.tx)&&Array.isArray(s.cats)){
       const accts=Array.isArray(s.accts)&&s.accts.length?s.accts:[{name:'Bar'}];
       s.tx.forEach(t=>{if(!t.acct)t.acct=accts[0].name;});paint(s.cats);
-      return{cats:s.cats,tx:s.tx,accts,checks:Array.isArray(s.checks)?s.checks:[],orders:Array.isArray(s.orders)?s.orders:[],meta:Object.assign({dirty:0,lastExport:null},s.meta)};
+      return{cats:s.cats,tx:s.tx,accts,checks:Array.isArray(s.checks)?s.checks:[],orders:Array.isArray(s.orders)?s.orders:[],loans:Array.isArray(s.loans)?s.loans:[],meta:Object.assign({dirty:0,lastExport:null},s.meta)};
     }
   }catch(e){}
   return defaults();
@@ -505,7 +516,7 @@ function renderSettings(){
   $('#v-settings').innerHTML=h;
 }
 let view='overview',addType='out',addCat=null,addAcct=null,addTo=null,addRepeat=false,addInt='m',addUntil='',editing=null,editingOrder=null,newAcctFor='from',catType='out',moreSub='cats';
-const MORE=['cats','accts','orders','excel','settings'];
+const MORE=['cats','accts','orders','loans','excel','settings'];
 const UIKEY='haushaltsbuch.ui';
 let st=Object.assign({range:'month',from:'',to:'',gran:'auto',acct:'*',ptype:'out',off:[]},(()=>{try{return JSON.parse(localStorage.getItem(UIKEY))||{};}catch(e){return{};}})());
 st.sel=null;if(!Array.isArray(st.off))st.off=[];
@@ -525,7 +536,7 @@ function dlgNow({title,text,fields=[],ok='OK',cancel='Abbrechen',danger=false}){
   return new Promise(res=>{
     const m=$('#modal');
     m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><h2>${esc(title)}</h2>`+(text?`<div class="note" style="margin:0 0 8px;white-space:pre-line">${esc(text)}</div>`:'')
-      +fields.map((f,i)=>`<label class="field"><span>${esc(f.label)}</span><input class="f" data-i="${i}" value="${esc(f.value??'')}"${f.inputmode?` inputmode="${f.inputmode}"`:''} autocomplete="off">${f.hint?`<div class="note" style="margin:4px 2px 0">${esc(f.hint)}</div>`:''}</label>`).join('')
+      +fields.map((f,i)=>`<label class="field"><span>${esc(f.label)}</span><input class="f" data-i="${i}"${f.type?` type="${f.type}"`:''} value="${esc(f.value??'')}"${f.inputmode?` inputmode="${f.inputmode}"`:''} autocomplete="off">${f.hint?`<div class="note" style="margin:4px 2px 0">${esc(f.hint)}</div>`:''}</label>`).join('')
       +`<div class="row2"><button class="btn sec" data-d="no">${esc(cancel)}</button><button class="btn${danger?' warn':''}" data-d="ok">${esc(ok)}</button></div></div>`;
     m.hidden=false;
     const vals=()=>[...m.querySelectorAll('input')].map(i=>i.value);
@@ -658,6 +669,7 @@ function tables(){
     kategorien:[['Kategorie','Typ','Status','Farbe'],...state.cats.map(c=>[c.name,typeName(c.type),c.hidden?'Ausgeblendet':'Aktiv',c.color&&/^#/.test(c.color)?c.color:''])],
     konten:[['Konto'],...state.accts.map(a=>[a.name])],
     kontostaende:[['Monat','Konto','Kontostand zu Monatsbeginn'],...state.checks.slice().sort((a,b)=>a.month.localeCompare(b.month)||a.acct.localeCompare(b.acct)).map(c=>[c.month,c.acct,c.amount])],
+    leihgaben:[['ID','Datum','Name','Betrag','Art','Erledigt'],...state.loans.map(l=>[l.id,l.date,l.name,l.amount,l.dir==='b'?'Geliehen':'Verliehen',l.done?'Ja':'Nein'])],
     dauerauftraege:[['ID','Typ','Kategorie','Betrag','Notiz','Konto','Zielkonto','Intervall','Start','Ende','Gebucht','Aktiv'],...state.orders.map(o=>[o.id,typeName(o.type),o.type==='tr'?'':o.cat,o.amount,o.note||'',o.acct,o.type==='tr'?(o.to||''):'',intLabel(o.interval),o.start,o.until||'',o.n||0,o.active?'Ja':'Nein'])]
   };
 }
@@ -668,6 +680,7 @@ function workbookBytes(){
     {name:'Kategorien',cols:[28,12,14,10],rows:[hd(t.kategorien[0]),...t.kategorien.slice(1)]},
     {name:'Konten',cols:[28],rows:[hd(t.konten[0]),...t.konten.slice(1)]},
     {name:'Kontostände',cols:[10,28,26],rows:[hd(t.kontostaende[0]),...t.kontostaende.slice(1)]},
+    {name:'Leihgaben',cols:[14,12,26,12,12,10],rows:[hd(t.leihgaben[0]),...t.leihgaben.slice(1).map(r=>r.map((v,i)=>i===1&&v?{d:v}:v))]},
     {name:'Daueraufträge',cols:[12,11,22,12,28,16,16,16,12,12,10,8],rows:[hd(t.dauerauftraege[0]),...t.dauerauftraege.slice(1).map(r=>r.map((v,i)=>(i===8||i===9)&&v?{d:v}:v))]}
   ]);
 }
@@ -686,7 +699,7 @@ async function parseWorkbook(buf){
   if(!find('buchungen'))return null;
   const g=n=>{const k=find(n);return k?wb.sheets[k]:[];};
   const so=find('daueraufträge');
-  return parseTables({buchungen:g('buchungen'),kategorien:g('kategorien'),konten:g('konten'),kontostaende:g('kontostände'),dauerauftraege:so?wb.sheets[so]:undefined});
+  return parseTables({buchungen:g('buchungen'),kategorien:g('kategorien'),konten:g('konten'),kontostaende:g('kontostände'),dauerauftraege:so?wb.sheets[so]:undefined,leihgaben:(()=>{const k=find('leihgaben');return k?wb.sheets[k]:undefined;})()});
 }
 function parseTables(t){
   const rowsOf=a=>(a||[]).slice(1).filter(r=>r&&r.some(c=>c!==''&&c!=null));
@@ -741,9 +754,19 @@ function parseTables(t){
   });
   if(!cats.length)defaults().cats.forEach(c=>cats.push(c));
   paint(cats);
-  return{cats,tx,accts,checks,orders,skipped};
+  let loans;
+  if(t.leihgaben&&t.leihgaben.length>0){
+    loans=[];const lids=new Set();
+    rowsOf(t.leihgaben).forEach(r=>{
+      const date=normDate(r[1]),name=String(r[2]||'').trim(),amount=parseAmount(r[3]);
+      if(!date||!name||!isFinite(amount)||!(Math.abs(amount)>0)){skipped++;return;}
+      let id=String(r[0]??'').trim();if(!id||lids.has(id))id=uid();lids.add(id);
+      loans.push({id,date,name,amount:Math.abs(amount),dir:/^g/i.test(String(r[4]||'').trim())?'b':'l',done:/^(j|y)/i.test(String(r[5]||'').trim())});
+    });
+  }
+  return{cats,tx,accts,checks,orders,loans,skipped};
 }
-const localData=()=>({cats:state.cats,tx:state.tx,accts:state.accts,checks:state.checks,orders:state.orders});
+const localData=()=>({cats:state.cats,tx:state.tx,accts:state.accts,checks:state.checks,orders:state.orders,loans:state.loans});
 function mergeData(a,b){
   const cats=[],accts=[],checks=[],tx=[],seen=new Set();
   [a,b].forEach(d=>d.tx.forEach(t=>{if(!seen.has(t.id)){seen.add(t.id);tx.push(Object.assign({},t));}}));
@@ -751,11 +774,12 @@ function mergeData(a,b){
   [a.accts,b.accts].forEach(l=>l.forEach(x=>{if(!accts.some(y=>y.name.toLowerCase()===x.name.toLowerCase()))accts.push(Object.assign({},x));}));
   [a.checks||[],b.checks||[]].forEach(l=>l.forEach(c=>{if(!checks.some(y=>y.month===c.month&&y.acct===c.acct))checks.push(Object.assign({},c));}));
   const orders=[];[a.orders||[],b.orders||[]].forEach(l=>l.forEach(o=>{const ex=orders.find(x=>x.id===o.id);if(!ex)orders.push(Object.assign({},o));else if((o.n||0)>(ex.n||0))ex.n=o.n;}));
+  const loans=[];[a.loans||[],b.loans||[]].forEach(l=>l.forEach(o=>{const ex=loans.find(x=>x.id===o.id);if(!ex)loans.push(Object.assign({},o));else if(o.done)ex.done=true;}));
   paint(cats);
-  return{cats,tx,accts,checks,orders};
+  return{cats,tx,accts,checks,orders,loans};
 }
 function applyData(p,fromCloud){
-  state.cats=p.cats;state.tx=p.tx;state.accts=p.accts;state.checks=p.checks||[];if(p.orders)state.orders=p.orders;state.meta.dirty=0;persist();
+  state.cats=p.cats;state.tx=p.tx;state.accts=p.accts;state.checks=p.checks||[];if(p.orders)state.orders=p.orders;if(p.loans)state.loans=p.loans;state.meta.dirty=0;persist();
   {const r=runOrders();if(r.made||r.moved)persist();}
   if(!catsOf(addType).some(c=>c.name===addCat))addCat=null;
   if(!state.accts.some(a=>a.name===addAcct))addAcct=null;
@@ -777,12 +801,12 @@ const GS_CODE=`// Haushaltsbuch - Synchronisierung mit Google Sheets
 // Dieses Skript gehoert in die Google-Tabelle: Erweiterungen > Apps Script
 var KEY = '__KEY__';
 
-var NAMES = ['Buchungen', 'Kategorien', 'Konten', 'Kontostände', 'Daueraufträge'];
-var FIELDS = { 'Buchungen': 'buchungen', 'Kategorien': 'kategorien', 'Konten': 'konten', 'Kontostände': 'kontostaende', 'Daueraufträge': 'dauerauftraege' };
-var TEXTCOLS = { 'Buchungen': [1, 2, 3, 5, 6, 7, 8], 'Kategorien': [1, 2, 3, 4], 'Konten': [1], 'Kontostände': [1, 2], 'Daueraufträge': [1, 2, 3, 5, 6, 7, 8, 9, 10, 12] };
+var NAMES = ['Buchungen', 'Kategorien', 'Konten', 'Kontostände', 'Daueraufträge', 'Leihgaben'];
+var FIELDS = { 'Buchungen': 'buchungen', 'Kategorien': 'kategorien', 'Konten': 'konten', 'Kontostände': 'kontostaende', 'Daueraufträge': 'dauerauftraege', 'Leihgaben': 'leihgaben' };
+var TEXTCOLS = { 'Buchungen': [1, 2, 3, 5, 6, 7, 8], 'Kategorien': [1, 2, 3, 4], 'Konten': [1], 'Kontostände': [1, 2], 'Daueraufträge': [1, 2, 3, 5, 6, 7, 8, 9, 10, 12], 'Leihgaben': [1, 2, 3, 5, 6] };
 
 function out_(obj) {
-  obj.v = 2;
+  obj.v = 3;
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -1165,6 +1189,40 @@ function renderAdd(){
   if($('#repUntil').value!==addUntil)$('#repUntil').value=addUntil;
   renderRepPrev();
 }
+function renderLoans(){
+  const f=iso=>dOf(iso).toLocaleDateString('de-DE'),open=state.loans.filter(l=>!l.done);
+  const lent=r2(open.filter(l=>l.dir!=='b').reduce((a,l)=>a+l.amount,0)),bor=r2(open.filter(l=>l.dir==='b').reduce((a,l)=>a+l.amount,0));
+  let h='<h2>Leihgaben</h2><button class="btn" data-act="loanNew">'+ic('plus')+' Neuer Eintrag</button>';
+  h+=`<div class="sum"><div><small>Mir geschuldet</small><b class="pos">${eur(lent)}</b></div><div><small>Ich schulde</small><b class="neg">${eur(bor)}</b></div></div>`;
+  if(!state.loans.length)h+='<div class="empty">Noch keine Einträge.<br>Merke dir hier, wem du Geld geliehen hast oder von wem du welches bekommen hast.</div>';
+  else{
+    const list=state.loans.slice().sort((a,b)=>(a.done-b.done)||b.date.localeCompare(a.date));
+    h+='<div class="card">'+list.map(l=>`<button class="loan${l.done?' done':''}" data-loan="${l.id}"><span class="t">${esc(l.name)}<span class="tag">${l.dir==='b'?'geliehen':'verliehen'}${l.done?' · erledigt':''}</span><small>${f(l.date)}</small></span><b class="${l.dir==='b'?'neg':'pos'}">${eur(l.amount)}</b></button>`).join('')+'</div><div class="note">Diese Liste ist getrennt von deinen Konten und Buchungen und verändert keine Salden.</div>';
+  }
+  $('#v-loans').innerHTML=h;
+}
+async function loanForm(l){
+  let dir=l?l.dir:null;
+  if(!dir){dir=await choose({title:'Neuer Eintrag',options:[{k:'l',label:'Ich habe Geld verliehen'},{k:'b',label:'Ich habe Geld geliehen'}],cancel:'Abbrechen'});if(!dir)return;}
+  const fields=[{label:dir==='b'?'Von wem?':'An wen?',value:l?l.name:''},{label:'Betrag (€)',value:l?fmtIn(l.amount):'',inputmode:'decimal'},{label:'Datum',value:l?l.date:todayISO(),type:'date'}];
+  for(;;){
+    const r=await dlg({title:l?'Eintrag bearbeiten':(dir==='b'?'Geliehen':'Verliehen'),fields,ok:'Speichern'});
+    if(!r)return;
+    r.forEach((v,i)=>fields[i].value=v);
+    const name=r[0].trim(),amount=parseAmount(r[1]),date=r[2]||todayISO();
+    if(!name){toast('Bitte einen Namen eingeben');continue;}
+    if(!(amount>0)){toast('Bitte einen gültigen Betrag eingeben');continue;}
+    if(l)Object.assign(l,{name,amount,date});else state.loans.push({id:uid(),date,name,amount,dir,done:false});
+    changed();renderAll();toast('Gespeichert');return;
+  }
+}
+async function loanMenu(id){
+  const l=state.loans.find(x=>x.id===id);if(!l)return;
+  const k=await choose({title:l.name+' · '+eur(l.amount),options:[{k:'edit',label:'Bearbeiten'},{k:'done',label:l.done?'Wieder als offen markieren':'Als erledigt markieren'},{k:'del',label:'Löschen',sec:1}],cancel:'Schließen'});
+  if(k==='edit')await loanForm(l);
+  else if(k==='done'){l.done=!l.done;changed();renderAll();}
+  else if(k==='del'&&await uiConfirm('Eintrag löschen?','Dieser Eintrag wird endgültig gelöscht.','Löschen',true)){state.loans=state.loans.filter(x=>x.id!==id);changed();renderAll();toast('Gelöscht');}
+}
 function renderOrders(){
   const f=iso=>dOf(iso).toLocaleDateString('de-DE');
   let h='<h2>Daueraufträge</h2><button class="btn" data-act="orderNew">'+ic('plus')+' Neuer Dauerauftrag</button>';
@@ -1223,7 +1281,7 @@ function renderExcel(){
     h+=`<div class="srow"><span>Status</span><span class="pill ${cls}">${esc(txt)}</span></div>
       <div class="srow"><span>Zuletzt synchronisiert</span><span>${last}</span></div>
       <div class="note">Änderungen werden automatisch hochgeladen. Beim Öffnen und beim Zurückkehren in die App wird auf Änderungen von anderen Geräten geprüft.</div>
-      ${(sync.v||1)<2?`<div class="note" style="color:var(--warn)"><b style="display:inline">Google-Skript veraltet.</b> Umbuchungen werden schon abgeglichen, die Daueraufträge aber erst nach einem Skript-Update.</div>`:''}
+      ${(sync.v||1)<3?`<div class="note" style="color:var(--warn)"><b style="display:inline">Google-Skript veraltet.</b> Daueraufträge und Leihgaben werden erst nach einem Skript-Update zwischen Geräten abgeglichen.</div>`:''}
       <div class="stack"><button class="btn" data-act="gsSync">Jetzt synchronisieren</button><button class="btn sec" data-act="gsDisc">Verbindung trennen</button></div>
       <details><summary>Google-Skript aktualisieren</summary>
         <ol class="steps">
@@ -1261,7 +1319,7 @@ function renderExcel(){
 function renderAll(){
   const d=new Date(+ym.slice(0,4),+ym.slice(5)-1,1);
   $('#mlabel').textContent=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
-  renderStatus();renderOverview();renderHistory();renderAdd();renderCats();renderAccts();renderOrders();renderStats();renderExcel();renderSettings();
+  renderStatus();renderOverview();renderHistory();renderAdd();renderCats();renderAccts();renderOrders();renderLoans();renderStats();renderExcel();renderSettings();
 }
 function acctCard(){
   const nm=netMap(),hasPrior=state.tx.some(t=>t.date.slice(0,7)<ym);
@@ -1412,6 +1470,7 @@ function show(v){
   if(v==='add'&&!editing&&!$('#dt').value)$('#dt').value=todayISO();
   if(v==='stats')renderStats();
   if(v==='orders')renderOrders();
+  if(v==='loans')renderLoans();
   if(v==='settings')renderSettings();
   window.scrollTo(0,0);
 }
@@ -1550,6 +1609,7 @@ document.addEventListener('click',async e=>{
   if(el.id==='chipNewTo'){newAcctFor='to';$('#newacct').hidden=false;$('#newacctName').focus();return;}
   if(el.id==='repToggle'){addRepeat=!addRepeat;renderAdd();return;}
   if(el.closest('#repInt')){addInt=el.dataset.r;renderAdd();return;}
+  if(el.dataset.loan){loanMenu(el.dataset.loan);return;}
   if(el.dataset.oedit){editOrder(el.dataset.oedit);return;}
   if(el.dataset.otoggle){
     const o=state.orders.find(x=>x.id===el.dataset.otoggle);if(!o)return;
@@ -1624,6 +1684,7 @@ document.addEventListener('click',async e=>{
   else if(act==='gsSync')syncNow(true);
   else if(act==='gsDisc')gsDisconnect();
   else if(act==='copyScript')copyScript();
+  else if(act==='loanNew')loanForm(null);
   else if(act==='orderNew'){resetForm();addRepeat=true;addType='out';addCat=null;renderAdd();show('add');}
   else if(act==='balances')askBalances(targetMonth(),true);
   else if(act==='balancesAll')askBalances(targetMonth(),false);
