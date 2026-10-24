@@ -804,16 +804,42 @@ async function syncNow(manual){
   }catch(e){sync.err=(e instanceof TypeError)?'Keine Verbindung':String(e.message||e);if(manual)toast(sync.err);}
   finally{syncing=false;sync.busy=false;saveSync();renderStatus();renderExcel();if(syncAgain){syncAgain=false;syncNow();}}
 }
+function gsUrlProblem(url){
+  if(/^http:\/\/localhost/.test(url))return'';
+  if(!/^https:\/\/script\.google\.com\//.test(url))return'Das ist keine Web-App-Adresse von Google. Sie muss mit https://script.google.com/macros/s/ beginnen. Kopiere sie nach dem Bereitstellen aus dem Fenster „Neue Bereitstellung“ bzw. unter „Bereitstellungen verwalten“.';
+  if(/\/(edit|home)(\/|\?|$)/.test(url)||/\/projects\//.test(url))return'Das ist die Adresse des Skript-Editors, nicht die der Web-App. Nimm die Adresse, die nach „Bereitstellen“ angezeigt wird (endet auf /exec).';
+  if(/\/dev(\?|$)/.test(url))return'Diese Adresse endet auf /dev (Testversion) und funktioniert nur für dich im Editor. Nimm die Adresse der Bereitstellung, die auf /exec endet.';
+  if(!/\/exec(\?|$)/.test(url))return'Die Web-App-Adresse muss auf /exec enden. Prüfe, ob sie vollständig kopiert wurde.';
+  return'';
+}
+async function gsProbe(url){try{await fetch(url,{mode:'no-cors',cache:'no-store'});return true;}catch(e){return false;}}
 async function gsConnect(){
-  const url=(gsDraft.url||'').trim(),key=(gsDraft.key||'').trim();
-  if(!/^https?:\/\//.test(url)){toast('Bitte die Web-App-URL eintragen');return;}
+  const url=(gsDraft.url||'').replace(/\s+/g,''),key=(gsDraft.key||'').trim();
+  if(!url){toast('Bitte die Web-App-URL eintragen');return;}
+  const prob=gsUrlProblem(url);
+  if(prob){await dlg({title:'Diese URL passt nicht',text:prob,ok:'OK',cancel:'Schließen'});return;}
   if(!/^[A-Za-z0-9_-]{8,}$/.test(key)){toast('Schlüssel: mind. 8 Zeichen, nur Buchstaben, Zahlen, - und _');return;}
   Object.assign(sync,{url,key,rev:null,dirty:false,err:'',last:0});saveSync();
   toast('Verbinde …');
   try{await gsCall('rev');}
-  catch(e){sync.url='';sync.key='';saveSync();renderStatus();renderExcel();toast(e instanceof TypeError?'Keine Verbindung zu dieser URL':e.message);return;}
+  catch(e){
+    sync.url='';sync.key='';saveSync();renderStatus();renderExcel();
+    if(e instanceof TypeError){
+      const reach=await gsProbe(url);
+      await dlg({title:'Keine Verbindung zu Google Sheets',ok:'OK',cancel:'Schließen',text:reach
+        ?'Die Adresse ist erreichbar, aber Google lässt die App nicht durch. Das liegt fast immer an der Bereitstellung:\n\n1. Apps Script öffnen: Bereitstellen → Bereitstellungen verwalten → Stift-Symbol.\n2. „Wer hat Zugriff“ auf „Jeder“ stellen.\n3. Bei „Version“ „Neue Version“ wählen und auf „Bereitstellen“ tippen.\n4. Die angezeigte /exec-Adresse hier erneut einfügen.\n\nTest: Öffne die Adresse in einem neuen Browser-Tab. Dort muss {"ok":true,…} stehen. Siehst du eine Google-Anmeldung, ist der Zugriff nicht auf „Jeder“ gestellt.'
+        :'Die Adresse ist nicht erreichbar. Prüfe deine Internetverbindung, ob die URL vollständig und ohne Tippfehler eingefügt ist und ob ein Werbe- oder Inhaltsblocker Google-Adressen sperrt.'});
+    }else await dlg({title:'Verbindung fehlgeschlagen',text:e.message,ok:'OK',cancel:'Schließen'});
+    return;
+  }
   gsDraft.url='';saveDraft();
   await syncNow(true);
+}
+function gsTest(){
+  const url=(gsDraft.url||'').replace(/\s+/g,'');
+  if(!url){toast('Bitte erst die Web-App-URL eintragen');return;}
+  const prob=gsUrlProblem(url);if(prob){dlg({title:'Diese URL passt nicht',text:prob,ok:'OK',cancel:'Schließen'});return;}
+  window.open(url,'_blank','noopener');
 }
 async function gsDisconnect(){
   if(!(await uiConfirm('Verbindung trennen?','Deine Daten bleiben auf diesem Gerät und in Google Sheets erhalten, werden aber nicht mehr abgeglichen.','Trennen')))return;
@@ -1019,7 +1045,7 @@ function renderExcel(){
     h+=`<div class="note">Speichert alle Daten automatisch in einer Google-Tabelle und gleicht sie zwischen iPhone, Handy und Computer ab. Die Tabelle lässt sich jederzeit als Excel-Datei herunterladen.</div>
       <label class="field"><span>Web-App-URL</span><input class="f" id="gsUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(gsDraft.url||'')}"></label>
       <label class="field"><span>Schlüssel (Passwort für die Verbindung)</span><input class="f" id="gsKey" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(gsDraft.key||'')}"></label>
-      <div class="stack"><button class="btn" data-act="gsConnect">Verbinden</button></div>
+      <div class="stack"><button class="btn" data-act="gsConnect">Verbinden</button><button class="btn sec" data-act="gsTest">URL im Browser testen</button></div><div class="note">Der Test öffnet die Adresse in einem neuen Tab. Dort muss <b style="display:inline">{"ok":true,…}</b> stehen.</div>
       <details><summary>Einrichtung in 5 Schritten</summary>
         <ol class="steps">
           <li>Auf <b>sheets.google.com</b> eine neue, leere Tabelle anlegen.</li>
@@ -1356,6 +1382,7 @@ document.addEventListener('click',async e=>{
   else if(act==='import')$('#fileIn').click();
   else if(act==='persist'){try{persisted=await navigator.storage.persist();}catch(e){persisted=false;}renderSettings();toast(persisted?'Speicher geschützt':'Der Browser hat den Schutz abgelehnt');}
   else if(act==='gsConnect')gsConnect();
+  else if(act==='gsTest')gsTest();
   else if(act==='gsSync')syncNow(true);
   else if(act==='gsDisc')gsDisconnect();
   else if(act==='copyScript')copyScript();
