@@ -177,6 +177,8 @@ pre.code{background:var(--chip);border-radius:12px;padding:12px;font-size:11.5px
 #v-loans .sum div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
 #v-loans .sum small{display:block;color:var(--mute);font-size:12.5px}
 #v-loans .sum b{font-size:18px}
+.hrow{display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px}.hrow h3{margin:0}
+.iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--chip);color:var(--ink);border:1px solid var(--line)}.iconbtn .ic{width:20px;height:20px}
 </style>
 </head>
 <body>
@@ -426,6 +428,7 @@ const ICONS={
  sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
  pencil:'<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
  trash:'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6M14 11v6"/>',
+ eyeoff:'<path d="M10.7 5.1A10 10 0 0 1 12 5c7 0 10 7 10 7a13 13 0 0 1-1.7 2.7"/><path d="M6.6 6.6A13 13 0 0 0 2 12s3 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m2 2 20 20"/>',
  eye:'<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
  calendar:'<path d="M8 2v4M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/>',
  folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
@@ -1321,9 +1324,12 @@ function renderAll(){
   $('#mlabel').textContent=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
   renderStatus();renderOverview();renderHistory();renderAdd();renderCats();renderAccts();renderOrders();renderLoans();renderStats();renderExcel();renderSettings();
 }
+const showAcct=()=>{try{return localStorage.getItem('hb.showAcct')==='1';}catch(e){return false;}};
 function acctCard(){
+  const on=showAcct(),hd=`<div class="hrow"><h3 style="margin:0">Kontostände</h3><button class="iconbtn" data-act="acctToggle" aria-label="${on?'Kontostände ausblenden':'Kontostände einblenden'}" aria-pressed="${on}" title="${on?'Ausblenden':'Einblenden'}">${ic(on?'eye':'eyeoff')}</button></div>`;
+  if(!on)return hd;
   const nm=netMap(),hasPrior=state.tx.some(t=>t.date.slice(0,7)<ym);
-  return'<h3>Kontostände</h3><div class="card">'+state.accts.map(a=>{
+  return hd+'<div class="card">'+state.accts.map(a=>{
     const s0=startBal(a.name,ym,nm),en=endBal(a.name,ym,nm),chk=state.checks.find(c=>c.month===ym&&c.acct===a.name);
     let hint='';
     if(chk&&hasPrior){const diff=r2(chk.amount-endBal(a.name,addM(ym,-1),nm));if(Math.abs(diff)>=0.01)hint=` · Abgleich ${diff>0?'+':'−'}${eur(Math.abs(diff))}`;}
@@ -1684,6 +1690,7 @@ document.addEventListener('click',async e=>{
   else if(act==='gsSync')syncNow(true);
   else if(act==='gsDisc')gsDisconnect();
   else if(act==='copyScript')copyScript();
+  else if(act==='acctToggle'){try{localStorage.setItem('hb.showAcct',showAcct()?'0':'1');}catch(e){}renderOverview();}
   else if(act==='loanNew')loanForm(null);
   else if(act==='orderNew'){resetForm();addRepeat=true;addType='out';addCat=null;renderAdd();show('add');}
   else if(act==='balances')askBalances(targetMonth(),true);
